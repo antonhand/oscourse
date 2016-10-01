@@ -11,6 +11,7 @@
 #include <kern/monitor.h>
 #include <kern/kdebug.h>
 
+
 #define CMDBUF_SIZE	80	// enough for one VGA text line
 
 
@@ -24,6 +25,8 @@ struct Command {
 static struct Command commands[] = {
 	{ "help", "Display this list of commands", mon_help },
 	{ "kerninfo", "Display information about the kernel", mon_kerninfo },
+	{ "text", "Display any text", mon_text },
+	{ "backtrace", "Display backtrace", mon_backtrace },
 };
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
 
@@ -60,9 +63,25 @@ mon_kerninfo(int argc, char **argv, struct Trapframe *tf)
 }
 
 int
+mon_text(int argc, char **argv, struct Trapframe *tf)
+{
+	cprintf("Any text\n");
+	return 0;
+}
+
+int
 mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 {
-	// Your code here.
+	cprintf("Stack backtrace:\n");
+	int *ebp = (int *)read_ebp();
+	while(ebp != NULL){
+		int eip = *(ebp + 1);
+		cprintf("ebp %08x eip %08x args %08x %08x %08x %08x %08x\n", (unsigned int)ebp, eip, *(ebp + 2), *(ebp + 3), *(ebp + 4), *(ebp + 5), *(ebp + 6));
+		struct Eipdebuginfo info;
+		debuginfo_eip(eip, &info);
+		cprintf("%s:%d: %.*s+%d\n", info.eip_file, info.eip_line, info.eip_fn_namelen, info.eip_fn_name, eip - info.eip_fn_addr);
+		ebp = (int*)*ebp;
+	}
 	return 0;
 }
 
@@ -104,6 +123,7 @@ runcmd(char *buf, struct Trapframe *tf)
 	// Lookup and invoke the command
 	if (argc == 0)
 		return 0;
+	cprintf("%x %x %x\n", argc, (unsigned int)argv, (unsigned int)tf);
 	for (i = 0; i < NCOMMANDS; i++) {
 		if (strcmp(argv[0], commands[i].name) == 0)
 			return commands[i].func(argc, argv, tf);
@@ -119,8 +139,6 @@ monitor(struct Trapframe *tf)
 
 	cprintf("Welcome to the JOS kernel monitor!\n");
 	cprintf("Type 'help' for a list of commands.\n");
-
-
 	while (1) {
 		buf = readline("K> ");
 		if (buf != NULL)
