@@ -26,8 +26,26 @@ sched_yield(void)
 	// below to halt the cpu.
 
 	// LAB 3: Your code here.
-	env_run(&envs[0]);
-	
+	uint32_t i = 0;
+	struct Env *e = envs;
+	if(curenv){
+		e = curenv;
+	}
+	cprintf("uecb\n");
+	for(;e + i < envs + NENV; i++){
+		if (e[i].env_status == ENV_RUNNABLE){
+					 env_run(&e[i]);
+					 return;
+				 }
+	}
+	i = 0;
+	for(;e + i <= curenv; i++){
+		if ((e[i].env_status == ENV_RUNNABLE ||
+				 e[i].env_status == ENV_RUNNING)){
+					 env_run(&envs[i]);
+					 return;
+				 }
+	}
 	// sched_halt never returns
 	sched_halt();
 }
@@ -66,4 +84,3 @@ sched_halt(void)
 		"hlt\n"
 	: : "a" (cpu_ts.ts_esp0));
 }
-

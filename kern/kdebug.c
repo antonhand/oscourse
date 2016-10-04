@@ -180,7 +180,7 @@ debuginfo_eip(uintptr_t addr, struct Eipdebuginfo *info)
 	//	which one.
 	// Your code here.
 	stab_binsearch(stabs, &lline, &rline, N_SLINE, addr);
-	
+
 	if (lline<= rline) {
 		info->eip_line = stabs[lline].n_value;
 	}
@@ -213,10 +213,26 @@ debuginfo_eip(uintptr_t addr, struct Eipdebuginfo *info)
 uintptr_t
 find_function(const char * const fname)
 {
-	// const struct Stab *stabs = __STAB_BEGIN__, *stab_end = __STAB_END__;
-	// const char *stabstr = __STABSTR_BEGIN__, *stabstr_end = __STABSTR_END__;
+	const struct Stab *stabs = __STAB_BEGIN__, *stab_end = __STAB_END__;
+	const char *stabstr = __STABSTR_BEGIN__, *stabstr_end = __STABSTR_END__;
 	//LAB 3: Your code is here.
-
+	uint32_t i;
+	for(i = 0; i < stabstr_end - stabstr - strlen(fname) + 1; i++){
+		if(i > 0 && stabstr[i - 1] != '\0'){
+			continue;
+		}
+		if(!strncmp(fname, stabstr + i, strlen(fname))){
+			break;
+		}
+	}
+	//cprintf("%d %d ", stabstr_end - stabstr - strlen(fname) + 1, i);
+	for(;stabs < stab_end; stabs++){
+		//if(stabs->n_value == 0x100f5e) cprintf("%d\n", stabs->n_strx);
+		if(stabs->n_type == N_FUN && stabs->n_strx == i){
+		//	cprintf("%s %x\n", fname, *(int *)stabs->n_value);
+			return stabs->n_value;
+		}
+	}
+//	cprintf("0\n");
 	return 0;
 }
-

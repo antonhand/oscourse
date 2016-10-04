@@ -12,6 +12,7 @@
 #include <kern/monitor.h>
 #include <kern/sched.h>
 #include <kern/cpu.h>
+#include <kern/kdebug.h>
 
 struct Env env_array[NENV];
 struct Env *curenv = NULL;
@@ -23,12 +24,14 @@ static struct Env *env_free_list;	// Free environment list
 
 extern unsigned int bootstacktop;
 
+unsigned int stacktop = 0xf0210000;
+
 // Global descriptor table.
 //
 // Set up global descriptor table (GDT) with separate segments for
 // kernel mode and user mode.  Segments serve many purposes on the x86.
 // We don't use any of their memory-mapping capabilities, but we need
-// them to switch privilege levels. 
+// them to switch privilege levels.
 //
 // The kernel and user segments are identical except for the DPL.
 // To load the SS register, the CPL must equal the DPL.  Thus,
@@ -121,7 +124,16 @@ env_init(void)
 {
 	// Set up envs array
 	// LAB 3: Your code here.
-	
+	env_free_list = envs;
+	int i;
+	for(i = 0; i < NENV - 1; i++){
+		memset(&envs[i], 0, sizeof(envs[i]));
+		envs[i].env_link = envs + i + 1;
+		envs[i].env_status = ENV_FREE;
+	}
+	memset(&envs[NENV - 1], 0, sizeof(envs[NENV - 1]));
+	envs[NENV - 1].env_status = ENV_FREE;
+
 	// Per-CPU part of the initialization
 	env_init_percpu();
 }
@@ -200,7 +212,8 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 	e->env_tf.tf_ss = GD_KD | 0;
 	e->env_tf.tf_cs = GD_KT | 0;
 	// LAB 3: Your code here.
-	// e->env_tf.tf_esp = 0x210000;
+	 e->env_tf.tf_esp = stacktop;
+	 stacktop += PGSIZE * 4;
 #else
 #endif
 	// You will set e->env_tf.tf_eip later.
@@ -219,16 +232,45 @@ bind_functions(struct Env *e, struct Elf *elf)
 {
 	//find_function from kdebug.c should be used
 	//LAB 3: Your code here.
-
-	/*
-	*((int *) 0x00231008) = (int) &cprintf;
-	*((int *) 0x00221004) = (int) &sys_yield;
-	*((int *) 0x00231004) = (int) &sys_yield;
-	*((int *) 0x00241004) = (int) &sys_yield;
-	*((int *) 0x0022100c) = (int) &sys_exit;
-	*((int *) 0x00231010) = (int) &sys_exit;
-	*((int *) 0x0024100c) = (int) &sys_exit;
-	*/
+	struct Secthdr *sh = (struct Secthdr *) ((uint8_t *) elf + elf->e_shoff);
+	struct Secthdr *esh = sh + elf->e_shnum;
+	int strf = 0;
+	int symf = 0;
+	struct Secthdr *strt = NULL;
+	struct Secthdr *symt = NULL;
+	for(;sh < esh && (!strf || !symf) ; sh++){
+		if(!strf && sh->sh_type == ELF_SHT_STRTAB){
+			strt = sh;
+		  //strf = 1;
+		//	cprintf("str\n");
+		}
+		if(!symf && sh->sh_type == ELF_SHT_SYMTAB){
+			symt = sh;
+			//symf = 1;
+			//cprintf("sym\n");
+		}
+	}
+	char *str = (char *)elf + strt->sh_offset;
+	struct Elf32_Sym *sym = (struct Elf32_Sym *)((char *)elf + symt->sh_offset);
+	struct Elf32_Sym *esym = (struct Elf32_Sym *)((char *)elf + symt->sh_offset + symt->sh_size);
+	for(;sym < esym; sym++){
+		//cprintf("%s\n", str + sym->st_name);
+		if(!strcmp("cprintf", str + sym->st_name)){
+			//cprintf("%x %x %x cprintf\n", sym->st_value, (int)&cprintf, find_function("cprintf\0"));
+			*((int *)sym->st_value) = find_function("cprintf\0");
+			continue;
+		}
+		if(!strcmp("sys_yield", str + sym->st_name)){
+			//cprintf("%x %x %x sys_yield\n", sym->st_value, (int)&sys_yield, find_function("sys_yield\0"));
+			*((int *)sym->st_value) = find_function("sys_yield\0");
+			continue;
+		}
+		if(!strcmp("sys_exit", str + sym->st_name)){
+			//cprintf("%x %x %x sys_exit\n", sym->st_value, (int)&sys_exit, find_function("sys_exit"));
+			*((int *)sym->st_value) = find_function("sys_exit");
+			continue;
+		}
+	}
 }
 #endif
 
@@ -275,10 +317,29 @@ load_icode(struct Env *e, uint8_t *binary, size_t size)
 	//  What?  (See env_run() and env_pop_tf() below.)
 
 	// LAB 3: Your code here.
-	
+	struct Elf *Elfhdr = (struct Elf *)binary;
+	if (Elfhdr->e_magic != ELF_MAGIC){
+		panic("load_icode: bad Elf header");
+	}
+
+	struct Proghdr *ph = (struct Proghdr *) ((uint8_t *) Elfhdr + Elfhdr->e_phoff);
+	struct Proghdr *eph = ph + Elfhdr->e_phnum;
+	for (; ph < eph; ph++){
+		if(ph->p_type != ELF_PROG_LOAD){
+			continue;
+		}
+		if(ph->p_filesz > ph->p_memsz || size - ph->p_offset < ph->p_filesz) {
+			panic("load_icode:  out of memory");
+		}
+		memset((void *) ph->p_va, 0, ph->p_memsz);
+		memcpy((void *)ph->p_va, binary + ph->p_offset, ph->p_filesz);
+	}
+
+	e->env_tf.tf_eip = Elfhdr->e_entry;
+	cprintf("%x\n",*(int *)e->env_tf.tf_eip);
 #ifdef CONFIG_KSPACE
 	// Uncomment this for task №5.
-	//bind_functions();
+	bind_functions(e, Elfhdr);
 #endif
 }
 
@@ -293,6 +354,13 @@ void
 env_create(uint8_t *binary, size_t size, enum EnvType type)
 {
 	//LAB 3: Your code here.
+	struct Env *e;
+	int r =  env_alloc(&e, 0);
+	if(r){
+		panic("env_create: %i", r);
+	}
+	load_icode(e, binary, size);
+	e->env_type = type;
 }
 
 //
@@ -338,12 +406,14 @@ env_destroy(struct Env *e)
 void
 csys_exit(void)
 {
+	cprintf("ex\n");
 	env_destroy(curenv);
 }
 
 void
 csys_yield(struct Trapframe *tf)
 {
+	cprintf("yie\n");
 	memcpy(&curenv->env_tf, tf, sizeof(struct Trapframe));
 	sched_yield();
 }
@@ -362,7 +432,7 @@ env_pop_tf(struct Trapframe *tf)
 #ifdef CONFIG_KSPACE
 	static uintptr_t eip = 0;
 	eip = tf->tf_eip;
-
+	//cprintf("%x\n", *(int *)eip);
 	asm volatile (
 		"mov %c[ebx](%[tf]), %%ebx \n\t"
 		"mov %c[ecx](%[tf]), %%ecx \n\t"
@@ -420,12 +490,18 @@ env_run(struct Env *e)
 	//	e->env_tf to sensible values.
 	//
 	//LAB 3: Your code here.
-
 	cprintf("envrun %s: %d\n",
 		e->env_status == ENV_RUNNING ? "RUNNING" :
 		    e->env_status == ENV_RUNNABLE ? "RUNNABLE" : "(unknown)",
 		ENVX(e->env_id));
 
-	env_pop_tf(&e->env_tf);
+	if(curenv != e){
+		if(curenv && curenv->env_status == ENV_RUNNING){
+			curenv->env_status = ENV_RUNNABLE;
+		}
+		curenv = e;
+		curenv->env_status = ENV_RUNNING;
+		curenv->env_runs++;
+	}
+	env_pop_tf(&curenv->env_tf);
 }
-
