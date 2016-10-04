@@ -213,6 +213,7 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 	e->env_tf.tf_cs = GD_KT | 0;
 	// LAB 3: Your code here.
 	 e->env_tf.tf_esp = stacktop;
+	 e->env_tf.tf_regs.reg_ebp = stacktop;
 	 stacktop += PGSIZE * 4;
 #else
 #endif
@@ -322,6 +323,7 @@ load_icode(struct Env *e, uint8_t *binary, size_t size)
 		panic("load_icode: bad Elf header");
 	}
 
+	e->env_tf.tf_eip = Elfhdr->e_entry;
 	struct Proghdr *ph = (struct Proghdr *) ((uint8_t *) Elfhdr + Elfhdr->e_phoff);
 	struct Proghdr *eph = ph + Elfhdr->e_phnum;
 	for (; ph < eph; ph++){
@@ -334,8 +336,6 @@ load_icode(struct Env *e, uint8_t *binary, size_t size)
 		memset((void *) ph->p_va, 0, ph->p_memsz);
 		memcpy((void *)ph->p_va, binary + ph->p_offset, ph->p_filesz);
 	}
-
-	e->env_tf.tf_eip = Elfhdr->e_entry;
 	cprintf("%x\n",*(int *)e->env_tf.tf_eip);
 #ifdef CONFIG_KSPACE
 	// Uncomment this for task №5.

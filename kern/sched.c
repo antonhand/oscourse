@@ -26,8 +26,8 @@ sched_yield(void)
 	// below to halt the cpu.
 
 	// LAB 3: Your code here.
-	uint32_t i = 0;
-	struct Env *e = envs;
+	uint32_t i = 1;
+	struct Env *e = envs - 1;
 	if(curenv){
 		e = curenv;
 	}
@@ -39,9 +39,9 @@ sched_yield(void)
 				 }
 	}
 	i = 0;
-	for(;e + i <= curenv; i++){
-		if ((e[i].env_status == ENV_RUNNABLE ||
-				 e[i].env_status == ENV_RUNNING)){
+	for(;envs + i <= curenv; i++){
+		if ((envs[i].env_status == ENV_RUNNABLE ||
+				 envs[i].env_status == ENV_RUNNING)){
 					 env_run(&envs[i]);
 					 return;
 				 }
