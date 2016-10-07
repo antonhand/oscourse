@@ -217,22 +217,19 @@ find_function(const char * const fname)
 	const char *stabstr = __STABSTR_BEGIN__, *stabstr_end = __STABSTR_END__;
 	//LAB 3: Your code is here.
 	uint32_t i;
-	for(i = 0; i < stabstr_end - stabstr - strlen(fname) + 1; i++){
-		if(i > 0 && stabstr[i - 1] != '\0'){
-			continue;
-		}
-		if(!strncmp(fname, stabstr + i, strlen(fname))){
+	for(i = 1; i < stabstr_end - stabstr - strlen(fname) + 1; i += strlen(stabstr + i) + 1){
+		char tmp[1000];
+		size_t size = strfind(stabstr + i, ':') - stabstr - i;
+		strncpy(tmp, stabstr + i, size);
+		tmp[size] = '\0';
+		if(!strcmp(tmp, fname)){
 			break;
 		}
 	}
-	//cprintf("%d %d ", stabstr_end - stabstr - strlen(fname) + 1, i);
 	for(;stabs < stab_end; stabs++){
-		//if(stabs->n_value == 0x100f5e) cprintf("%d\n", stabs->n_strx);
 		if(stabs->n_type == N_FUN && stabs->n_strx == i){
-		//	cprintf("%s %x\n", fname, *(int *)stabs->n_value);
 			return stabs->n_value;
 		}
 	}
-//	cprintf("0\n");
 	return 0;
 }

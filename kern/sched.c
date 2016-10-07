@@ -31,7 +31,6 @@ sched_yield(void)
 	if(curenv){
 		e = curenv;
 	}
-	cprintf("uecb\n");
 	for(;e + i < envs + NENV; i++){
 		if (e[i].env_status == ENV_RUNNABLE){
 					 env_run(&e[i]);

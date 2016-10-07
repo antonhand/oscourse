@@ -24,7 +24,7 @@ static struct Env *env_free_list;	// Free environment list
 
 extern unsigned int bootstacktop;
 
-unsigned int stacktop = 0xf0210000;
+unsigned int stacktop = 0x210000;
 
 // Global descriptor table.
 //
@@ -214,7 +214,7 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 	// LAB 3: Your code here.
 	 e->env_tf.tf_esp = stacktop;
 	 e->env_tf.tf_regs.reg_ebp = stacktop;
-	 stacktop += PGSIZE * 4;
+	 stacktop += PGSIZE * 2;
 #else
 #endif
 	// You will set e->env_tf.tf_eip later.
@@ -239,37 +239,27 @@ bind_functions(struct Env *e, struct Elf *elf)
 	int symf = 0;
 	struct Secthdr *strt = NULL;
 	struct Secthdr *symt = NULL;
-	for(;sh < esh && (!strf || !symf) ; sh++){
-		if(!strf && sh->sh_type == ELF_SHT_STRTAB){
+	for(;sh < esh && (!(strf == elf->e_shstrndx) || !symf) ; sh++){
+		if(!(strf == elf->e_shstrndx) && sh->sh_type == ELF_SHT_STRTAB){
 			strt = sh;
-		  //strf = 1;
-		//	cprintf("str\n");
+			strf++;
 		}
 		if(!symf && sh->sh_type == ELF_SHT_SYMTAB){
 			symt = sh;
-			//symf = 1;
-			//cprintf("sym\n");
+			symf = 1;
 		}
 	}
+
 	char *str = (char *)elf + strt->sh_offset;
 	struct Elf32_Sym *sym = (struct Elf32_Sym *)((char *)elf + symt->sh_offset);
 	struct Elf32_Sym *esym = (struct Elf32_Sym *)((char *)elf + symt->sh_offset + symt->sh_size);
+
 	for(;sym < esym; sym++){
-		//cprintf("%s\n", str + sym->st_name);
-		if(!strcmp("cprintf", str + sym->st_name)){
-			//cprintf("%x %x %x cprintf\n", sym->st_value, (int)&cprintf, find_function("cprintf\0"));
-			*((int *)sym->st_value) = find_function("cprintf\0");
-			continue;
-		}
-		if(!strcmp("sys_yield", str + sym->st_name)){
-			//cprintf("%x %x %x sys_yield\n", sym->st_value, (int)&sys_yield, find_function("sys_yield\0"));
-			*((int *)sym->st_value) = find_function("sys_yield\0");
-			continue;
-		}
-		if(!strcmp("sys_exit", str + sym->st_name)){
-			//cprintf("%x %x %x sys_exit\n", sym->st_value, (int)&sys_exit, find_function("sys_exit"));
-			*((int *)sym->st_value) = find_function("sys_exit");
-			continue;
+		if(ELF32_ST_TYPE(sym->st_info) == STT_OBJECT){
+			uintptr_t ptr = find_function(str + sym->st_name);
+			if(ptr){
+				*((int *)sym->st_value) = ptr;
+			}
 		}
 	}
 }
@@ -336,7 +326,7 @@ load_icode(struct Env *e, uint8_t *binary, size_t size)
 		memset((void *) ph->p_va, 0, ph->p_memsz);
 		memcpy((void *)ph->p_va, binary + ph->p_offset, ph->p_filesz);
 	}
-	cprintf("%x\n",*(int *)e->env_tf.tf_eip);
+
 #ifdef CONFIG_KSPACE
 	// Uncomment this for task №5.
 	bind_functions(e, Elfhdr);
@@ -406,14 +396,12 @@ env_destroy(struct Env *e)
 void
 csys_exit(void)
 {
-	cprintf("ex\n");
 	env_destroy(curenv);
 }
 
 void
 csys_yield(struct Trapframe *tf)
 {
-	cprintf("yie\n");
 	memcpy(&curenv->env_tf, tf, sizeof(struct Trapframe));
 	sched_yield();
 }
@@ -432,7 +420,6 @@ env_pop_tf(struct Trapframe *tf)
 #ifdef CONFIG_KSPACE
 	static uintptr_t eip = 0;
 	eip = tf->tf_eip;
-	//cprintf("%x\n", *(int *)eip);
 	asm volatile (
 		"mov %c[ebx](%[tf]), %%ebx \n\t"
 		"mov %c[ecx](%[tf]), %%ecx \n\t"
