@@ -22,7 +22,7 @@ i386_init(void)
 	// Clear the uninitialized global data (BSS) section of our program.
 	// This ensures that all static/global variables start out zero.
 	memset(edata, 0, end - edata);
-	
+
 	// Initialize the console.
 	// Can't call cprintf until after we do this!
 	cons_init();
@@ -97,4 +97,3 @@ _warn(const char *file, int line, const char *fmt,...)
 	cprintf("\n");
 	va_end(ap);
 }
-
