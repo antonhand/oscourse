@@ -212,8 +212,7 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 	e->env_tf.tf_ss = GD_KD | 0;
 	e->env_tf.tf_cs = GD_KT | 0;
 	// LAB 3: Your code here.
-	 e->env_tf.tf_esp = stacktop;
-	 e->env_tf.tf_regs.reg_ebp = stacktop;
+	 e->env_tf.tf_esp = stacktop; //envx env_id 
 	 stacktop += PGSIZE * 2;
 #else
 #endif
