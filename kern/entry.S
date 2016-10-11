@@ -107,29 +107,20 @@ _generall_syscall:
 .globl sys_yield
 .type  sys_yield, @function
 sys_yield:
-	call _generall_syscall
 	cli
+	call _generall_syscall
 	call csys_yield
 	jmp .
 
 #LAB 3: Your code here.
-_generall_syscall_ex:
-popl  _g_ret
-popl ret_eip
-movl %ebp, ebp_reg
-movl %esp, esp_reg
-movl $0x0,%ebp
-movl $(bootstacktop),%esp
-
-pushl _g_ret
-	ret
 
 .stabs "sys_exit:",36,0,0,sys_exit
 .globl sys_exit
 .type  sys_exit, @function
 sys_exit:
-	call _generall_syscall_ex
 	cli
+	movl $0x0,%ebp
+	movl $(bootstacktop),%esp
 	call csys_exit
 	jmp .
 #endif
