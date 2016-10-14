@@ -30,7 +30,11 @@ KERN_SRCFILES :=	kern/entry.S \
 			kern/kdebug.c \
 			lib/printfmt.c \
 			lib/readline.c \
-			lib/string.c
+			lib/string.c \
+			kern/tsc.c
+
+KERN_SRCFILES +=       kern/spinlock.c \
+		       kern/alloc.c
 
 # Only build files if they exist.
 KERN_SRCFILES := $(wildcard $(KERN_SRCFILES))
