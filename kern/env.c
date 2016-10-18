@@ -24,7 +24,7 @@ static struct Env *env_free_list;	// Free environment list
 
 extern unsigned int bootstacktop;
 
-unsigned int stacktop = 0x210000;
+const unsigned int stacktop = 0x210000;
 
 // Global descriptor table.
 //
@@ -212,8 +212,7 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 	e->env_tf.tf_ss = GD_KD | 0;
 	e->env_tf.tf_cs = GD_KT | 0;
 	// LAB 3: Your code here.
-	 e->env_tf.tf_esp = stacktop; //envx env_id 
-	 stacktop += PGSIZE * 2;
+	 e->env_tf.tf_esp = stacktop + PGSIZE * 2 * e->env_id; 
 #else
 #endif
 

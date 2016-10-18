@@ -15,7 +15,7 @@ rtc_init(void)
 	outb(IO_RTC_CMND, RTC_AREG);
 	uint8_t a_val = inb(IO_RTC_DATA);
 	a_val |= 0xF;
-	outb(IO_RTC_DATA, a_val);
+	//outb(IO_RTC_DATA, a_val);
 
 	nmi_enable();
 }

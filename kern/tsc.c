@@ -10,6 +10,8 @@
 #define DEFAULT_FREQ 2500000
 #define TIMES 100
 
+uint64_t tsc = 0;
+
 unsigned long cpu_freq;
 /*
  * This reads the current MSB of the PIT counter, and
@@ -183,10 +185,17 @@ void tsc_calibrate(void)
 void timer_start(void)
 {
     //Lab 5: You code here
+		tsc_calibrate();
+		tsc = read_tsc();
 }
 
 void timer_stop(void)
 {
     //Lab 5: You code here
+		if(tsc){
+			cprintf("%lld\n", (read_tsc() - tsc) / cpu_freq / 1000);
+			tsc = 0;
+		} else {
+			cprintf("errot: TSC has not been started\n");
+		}
 }
-

@@ -10,6 +10,7 @@
 #include <kern/console.h>
 #include <kern/monitor.h>
 #include <kern/kdebug.h>
+#include <kern/tsc.h>
 
 
 #define CMDBUF_SIZE	80	// enough for one VGA text line
@@ -27,6 +28,8 @@ static struct Command commands[] = {
 	{ "kerninfo", "Display information about the kernel", mon_kerninfo },
 	{ "text", "Display any text", mon_text },
 	{ "backtrace", "Display backtrace", mon_backtrace },
+	{ "start", "Start tsc", tsc_start },
+	{ "stop", "Stop tsc", tsc_stop },
 };
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
 
@@ -85,7 +88,19 @@ mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 	return 0;
 }
 
+int
+tsc_start(int argc, char **argv, struct Trapframe *tf)
+{
+	timer_start();
+	return 0;
+}
 
+int
+tsc_stop(int argc, char **argv, struct Trapframe *tf)
+{
+	timer_stop();
+	return 0;
+}
 
 /***** Kernel monitor command interpreter *****/
 
@@ -123,7 +138,6 @@ runcmd(char *buf, struct Trapframe *tf)
 	// Lookup and invoke the command
 	if (argc == 0)
 		return 0;
-	cprintf("%x %x %x\n", argc, (unsigned int)argv, (unsigned int)tf);
 	for (i = 0; i < NCOMMANDS; i++) {
 		if (strcmp(argv[0], commands[i].name) == 0)
 			return commands[i].func(argc, argv, tf);
