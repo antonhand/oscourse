@@ -18,5 +18,6 @@ int mon_backtrace(int argc, char **argv, struct Trapframe *tf);
 int mon_text(int argc, char **argv, struct Trapframe *tf);
 int tsc_start(int argc, char **argv, struct Trapframe *tf);
 int tsc_stop(int argc, char **argv, struct Trapframe *tf);
+int mon_pages(int argc, char **argv, struct Trapframe *tf);
 
 #endif	// !JOS_KERN_MONITOR_H

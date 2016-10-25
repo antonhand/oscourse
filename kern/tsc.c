@@ -193,9 +193,9 @@ void timer_stop(void)
 {
     //Lab 5: You code here
 		if(tsc){
-			cprintf("%lld\n", (read_tsc() - tsc) / cpu_freq / 1000);
+			cprintf("%lld \n", (read_tsc() - tsc) / cpu_freq / 1000);
 			tsc = 0;
 		} else {
-			cprintf("errot: TSC has not been started\n");
+			cprintf("error: TSC has not been started\n");
 		}
 }

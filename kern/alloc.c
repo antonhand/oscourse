@@ -57,13 +57,14 @@ test_alloc(uint8_t nbytes)
 				p += p->s.size;
 				p->s.size = nunits;
 			}
+			spin_unlock(&sp);
 			return (void *)(p + 1);
 		}
 		if (p == freep) { /* wrapped around free list */
+			spin_unlock(&sp);
 			return NULL;
 		}
 	}
-	spin_unlock(&sp);
 }
 
 /* free: put block ap in free list */

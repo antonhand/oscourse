@@ -11,6 +11,7 @@
 #include <kern/monitor.h>
 #include <kern/kdebug.h>
 #include <kern/tsc.h>
+#include <kern/pmap.h>
 
 
 #define CMDBUF_SIZE	80	// enough for one VGA text line
@@ -30,10 +31,51 @@ static struct Command commands[] = {
 	{ "backtrace", "Display backtrace", mon_backtrace },
 	{ "start", "Start tsc", tsc_start },
 	{ "stop", "Stop tsc", tsc_stop },
+	{ "pages", "Stop tsc", mon_pages},
 };
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
 
 /***** Implementations of basic kernel monitor commands *****/
+
+int
+mon_pages(int argc, char **argv, struct Trapframe *tf)
+{
+	size_t status = is_page_free(&pages[1]);
+	size_t beg = 1;
+	size_t en = 0;
+	size_t i;
+	for(i = 1; i < npages; i++){
+		if(is_page_free(&pages[i]) == status){
+			en = i;
+		} else {
+			if(beg != en){
+				cprintf("%d..%d ", beg, en);
+			} else {
+				cprintf("%d ", beg);
+			}
+			if(!status){
+				cprintf("ALLOCATED\n");
+			} else {
+				cprintf("FREE\n");
+			}
+			beg = i;
+			status = is_page_free(&pages[i]);
+			en = i;
+		}
+	}
+
+	if(beg != en){
+		cprintf("%d..%d ", beg, en);
+	} else {
+		cprintf("%d ", beg);
+	}
+	if(!status){
+		cprintf("ALLOCATED\n");
+	} else {
+		cprintf("FREE\n");
+	}
+	return 0;
+}
 
 int
 mon_help(int argc, char **argv, struct Trapframe *tf)

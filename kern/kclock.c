@@ -29,8 +29,6 @@ rtc_check_status(void)
 	status = inb(IO_RTC_DATA);
 	return status;
 }
-<<<<<<< HEAD
-=======
 
 unsigned
 mc146818_read(unsigned reg)
@@ -45,5 +43,3 @@ mc146818_write(unsigned reg, unsigned datum)
 	outb(IO_RTC_CMND, reg);
 	outb(IO_RTC_DATA, datum);
 }
-
->>>>>>> lab6

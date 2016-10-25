@@ -5,6 +5,7 @@
 #include <inc/error.h>
 #include <inc/string.h>
 #include <inc/assert.h>
+#include <inc/memlayout.h>
 
 #include <kern/pmap.h>
 #include <kern/kclock.h>
@@ -65,6 +66,8 @@ static physaddr_t check_va2pa(pde_t *pgdir, uintptr_t va);
 static void check_page(void);
 static void check_page_installed_pgdir(void);
 
+extern pte_t entry_pgtable0[NPTENTRIES];
+
 // This simple physical memory allocator is used only while JOS is setting
 // up its virtual memory system.  page_alloc() is the real allocator.
 //
@@ -98,8 +101,12 @@ boot_alloc(uint32_t n)
 	// to a multiple of PGSIZE.
 	//
 	// LAB 6: Your code here.
-
-	return NULL;
+	char *ret = nextfree;
+	nextfree = ROUNDUP(nextfree + n, PGSIZE);
+	if(PADDR(nextfree) > entry_pgtable0[NPTENTRIES - 1] + PGSIZE) {
+		panic("Out of memory");
+	}
+	return ret;
 }
 
 // Set up a two-level page table:
@@ -114,14 +121,11 @@ boot_alloc(uint32_t n)
 void
 mem_init(void)
 {
-	uint32_t cr0;
+	//uint32_t cr0;
 	//size_t n;
 
 	// Find out how much memory the machine has (npages & npages_basemem).
 	i386_detect_memory();
-
-	// Remove this line when you're ready to test this function.
-	panic("mem_init: This function is not finished\n");
 
 	//////////////////////////////////////////////////////////////////////
 	// create initial page directory.
@@ -144,7 +148,8 @@ mem_init(void)
 	// array.  'npages' is the number of physical pages in memory.  Use memset
 	// to initialize all fields of each struct PageInfo to 0.
 	// Your code goes here:
-
+	pages = (struct PageInfo *)boot_alloc(sizeof(struct PageInfo) * npages);
+	memset(pages, 0, sizeof(struct PageInfo) * npages);
 
 	//////////////////////////////////////////////////////////////////////
 	// Now that we've allocated the initial kernel data structures, we set
@@ -156,7 +161,7 @@ mem_init(void)
 
 	check_page_free_list(1);
 	check_page_alloc();
-	check_page();
+	/*check_page();
 
 	//////////////////////////////////////////////////////////////////////
 	// Now we set up virtual memory
@@ -212,7 +217,7 @@ mem_init(void)
 	lcr0(cr0);
 
 	// Some more checks, only possible after kern_pgdir is installed.
-	check_page_installed_pgdir();
+	check_page_installed_pgdir();*/
 }
 
 // --------------------------------------------------------------
@@ -247,8 +252,19 @@ page_init(void)
 	// Change the code to reflect this.
 	// NB: DO NOT actually touch the physical memory corresponding to
 	// free pages!
+	pages[0].pp_ref = 1;
+	pages[0].pp_link = NULL;
 	size_t i;
-	for (i = 0; i < npages; i++) {
+	for (i = npages - 1; i > 0; i--) {
+		if (i >= IOPHYSMEM / PGSIZE && i < EXTPHYSMEM / PGSIZE ){
+			pages[i].pp_ref = 1;
+			pages[i].pp_link = NULL;
+			continue;
+		}
+		if (i >= EXTPHYSMEM / PGSIZE && i < ((size_t) boot_alloc(0) - KERNBASE) / PGSIZE){
+			pages[i].pp_link = NULL;
+			continue;
+		}
 		pages[i].pp_ref = 0;
 		pages[i].pp_link = page_free_list;
 		page_free_list = &pages[i];
@@ -270,8 +286,20 @@ page_init(void)
 struct PageInfo *
 page_alloc(int alloc_flags)
 {
-	// Fill this function in
-	return 0;
+	struct PageInfo *ret_val = page_free_list;
+
+	if (ret_val) {
+		page_free_list = page_free_list->pp_link;
+
+		ret_val->pp_ref = 0;
+		ret_val->pp_link = NULL;
+
+		if (alloc_flags & ALLOC_ZERO) {
+			memset(page2kva(ret_val), 0, PGSIZE);
+		}
+	}
+
+	return ret_val;
 }
 
 //
@@ -284,6 +312,16 @@ page_free(struct PageInfo *pp)
 	// Fill this function in
 	// Hint: You may want to panic if pp->pp_ref is nonzero or
 	// pp->pp_link is not NULL.
+	if (pp->pp_ref) {
+		panic("This page is in use");
+	}
+
+	if (pp->pp_link) {
+		panic("pp->pp_link is not NULL");
+	}
+
+	pp->pp_link = page_free_list;
+	page_free_list = pp;
 }
 
 //
@@ -827,4 +865,17 @@ check_page_installed_pgdir(void)
 	page_free(pp0);
 
 	cprintf("check_page_installed_pgdir() succeeded!\n");
+}
+
+int
+is_page_free(struct PageInfo *pp)
+{
+	struct PageInfo *cur = page_free_list;
+	while(cur){
+		if(pp == cur){
+			return 1;
+		}
+		cur = cur->pp_link;
+	}
+	return 0;
 }
