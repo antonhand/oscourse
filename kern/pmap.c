@@ -121,7 +121,7 @@ boot_alloc(uint32_t n)
 void
 mem_init(void)
 {
-	//uint32_t cr0;
+	uint32_t cr0;
 	//size_t n;
 
 	// Find out how much memory the machine has (npages & npages_basemem).
@@ -161,7 +161,7 @@ mem_init(void)
 
 	check_page_free_list(1);
 	check_page_alloc();
-	/*check_page();
+	check_page();
 
 	//////////////////////////////////////////////////////////////////////
 	// Now we set up virtual memory
@@ -173,6 +173,7 @@ mem_init(void)
 	//      (ie. perm = PTE_U | PTE_P)
 	//    - pages itself -- kernel RW, user NONE
 	// Your code goes here:
+	boot_map_region(kern_pgdir, UPAGES, ROUNDUP(sizeof(struct PageInfo) * npages, PGSIZE), PADDR(pages), PTE_U);
 
 	//////////////////////////////////////////////////////////////////////
 	// Use the physical memory that 'bootstack' refers to as the kernel
@@ -185,6 +186,7 @@ mem_init(void)
 	//       overwrite memory.  Known as a "guard page".
 	//     Permissions: kernel RW, user NONE
 	// Your code goes here:
+	boot_map_region(kern_pgdir, KSTACKTOP-KSTKSIZE, KSTKSIZE, PADDR(bootstack), PTE_W);
 
 	//////////////////////////////////////////////////////////////////////
 	// Map all of physical memory at KERNBASE.
@@ -194,8 +196,10 @@ mem_init(void)
 	// we just set up the mapping anyway.
 	// Permissions: kernel RW, user NONE
 	// Your code goes here:
+	boot_map_region(kern_pgdir, KERNBASE, ROUNDUP(0xfffff000 - KERNBASE, PGSIZE), 0x0, PTE_W);
 
 	// Check that the initial page directory has been set up correctly.
+	//check_kern_pgdir();
 	check_kern_pgdir();
 
 	// Switch from the minimal entry page directory to the full kern_pgdir
@@ -205,7 +209,7 @@ mem_init(void)
 	//
 	// If the machine reboots at this point, you've probably set up your
 	// kern_pgdir wrong.
-	lcr3(PADDR(kern_pgdir));
+	lcr3(PADDR(kern_pgdir));	
 
 	check_page_free_list(0);
 
@@ -217,7 +221,7 @@ mem_init(void)
 	lcr0(cr0);
 
 	// Some more checks, only possible after kern_pgdir is installed.
-	check_page_installed_pgdir();*/
+	check_page_installed_pgdir();
 }
 
 // --------------------------------------------------------------
@@ -361,7 +365,23 @@ pte_t *
 pgdir_walk(pde_t *pgdir, const void *va, int create)
 {
 	// Fill this function in
-	return NULL;
+	pde_t pde = pgdir[PDX(va)];
+	pte_t *ptable;
+	if(pde & PTE_P){
+		ptable = (pte_t *)KADDR(PTE_ADDR(pde)); 
+		return &ptable[PTX(va)];
+	}
+	if(!create){
+		return NULL;
+	}
+	struct PageInfo *newpage = page_alloc(ALLOC_ZERO);
+	if(newpage == NULL){
+		return NULL;
+	}
+	newpage->pp_ref++;
+	pgdir[PDX(va)] = page2pa(newpage) | PTE_P | PTE_W | PTE_U;
+	ptable = (pte_t*)page2kva(newpage);
+	return &ptable[PTX(va)];
 }
 
 //
@@ -379,6 +399,14 @@ static void
 boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm)
 {
 	// Fill this function in
+	unsigned int numPG = size / PGSIZE;
+	size_t i;
+	for(i = 0; i < numPG; ++i){
+		pte_t *pte = pgdir_walk(pgdir, (void *)va, 1);
+		*pte = pa | PTE_P | perm;
+		va += PGSIZE;
+		pa += PGSIZE;
+	}	
 }
 
 //
@@ -410,6 +438,25 @@ int
 page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 {
 	// Fill this function in
+	pte_t *pte = pgdir_walk(pgdir, va, 0);
+
+    if (pte) {
+        if (*pte & PTE_P){
+			if (PTE_ADDR(*pte) == page2pa(pp)){
+				*pte = page2pa(pp) | perm | PTE_P;
+				return 0;
+			}
+            page_remove(pgdir, va);
+		}
+    } else {
+	    pte = pgdir_walk(pgdir, va, 1);
+	    if (!pte){
+		    return -E_NO_MEM;
+		}
+    }
+	*pte = page2pa(pp) | perm | PTE_P;
+	pp->pp_ref++;
+    tlb_invalidate(pgdir, va);
 	return 0;
 }
 
@@ -428,7 +475,16 @@ struct PageInfo *
 page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 {
 	// Fill this function in
-	return NULL;
+	pte_t *pgtable = pgdir_walk(pgdir, va, 0);
+	if (!pgtable){
+		return NULL;
+	}
+
+	if(pte_store){
+		*pte_store = pgtable;
+	}
+
+	return pa2page(PTE_ADDR(*pgtable));
 }
 
 //
@@ -450,6 +506,15 @@ void
 page_remove(pde_t *pgdir, void *va)
 {
 	// Fill this function in
+	pte_t *pte;
+	struct PageInfo *pp = page_lookup(pgdir, va, &pte);
+	if(!pp){
+		return;
+	}
+
+	page_decref(pp);
+	*pte = 0;
+	tlb_invalidate(pgdir, va);
 }
 
 //
