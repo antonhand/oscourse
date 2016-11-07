@@ -182,6 +182,19 @@ void tsc_calibrate(void)
 		(unsigned long)cpu_freq % 1000);
 }
 
+void print_time(unsigned seconds)
+{
+	cprintf("%d\n", seconds);
+}
+
+void print_timer_error(void)
+{
+	cprintf("Timer Error\n");
+}
+
+//Lab 5: You code here
+//Use print_time function to print timert result.
+//Use print_timer_error function to print error.
 void timer_start(void)
 {
     //Lab 5: You code here
