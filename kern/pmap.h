@@ -29,7 +29,7 @@ static inline physaddr_t
 _paddr(const char *file, int line, void *kva)
 {
 	if ((uint32_t)kva < KERNBASE)
-		_panic(file, line, "PADDR called with invalid kva %08lx", kva);
+		_panic(file, line, "PADDR called with invalid kva %p", kva);
 	return (physaddr_t)kva - KERNBASE;
 }
 
@@ -41,7 +41,7 @@ static inline void*
 _kaddr(const char *file, int line, physaddr_t pa)
 {
 	if (PGNUM(pa) >= npages)
-		_panic(file, line, "KADDR called with invalid pa %08lx", pa);
+		_panic(file, line, "KADDR called with invalid pa %p", (void *) pa);
 	return (void *)(pa + KERNBASE);
 }
 
@@ -64,6 +64,8 @@ void	page_decref(struct PageInfo *pp);
 int is_page_free(struct PageInfo *pp);
 
 void	tlb_invalidate(pde_t *pgdir, void *va);
+
+void *	mmio_map_region(physaddr_t pa, size_t size);
 
 int	user_mem_check(struct Env *env, const void *va, size_t len, int perm);
 void	user_mem_assert(struct Env *env, const void *va, size_t len, int perm);
