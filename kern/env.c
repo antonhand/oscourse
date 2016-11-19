@@ -183,7 +183,6 @@ env_setup_vm(struct Env *e)
 	// Allocate a page for the page directory
 	if (!(p = page_alloc(ALLOC_ZERO)))
 		return -E_NO_MEM;
-
 	// Now, set e->env_pgdir and initialize the page directory.
 	//
 	// Hint:
@@ -201,6 +200,9 @@ env_setup_vm(struct Env *e)
 	//    - The functions in kern/pmap.h are handy.
 
 	// LAB 8: Your code here.
+	e->env_pgdir = page2kva(p);
+	memmove(e->env_pgdir, kern_pgdir, PGSIZE);
+	p->pp_ref++;
 
 	// UVPT maps the env's own page table read-only.
 	// Permissions: kernel R, user R
@@ -306,6 +308,16 @@ region_alloc(struct Env *e, void *va, size_t len)
 	//   'va' and 'len' values that are not page-aligned.
 	//   You should round va down, and round (va + len) up.
 	//   (Watch out for corner-cases!)
+	uintptr_t addr = ROUNDDOWN((uintptr_t)va, PGSIZE);
+	uintptr_t end = ROUNDUP((uintptr_t)va + len, PGSIZE);
+	while (addr < end) {
+        struct PageInfo *page = page_alloc(0);
+        if (page == NULL){
+            panic("region_alloc: not enough memory for page_alloc");
+		}
+        page_insert(e->env_pgdir, page, (void *)addr, PTE_U | PTE_W | PTE_P);
+	    addr += PGSIZE;
+	}
 }
 
 #ifdef CONFIG_KSPACE
@@ -408,6 +420,7 @@ load_icode(struct Env *e, uint8_t *binary, size_t size)
 	e->env_tf.tf_eip = Elfhdr->e_entry;
 	struct Proghdr *ph = (struct Proghdr *) ((uint8_t *) Elfhdr + Elfhdr->e_phoff);
 	struct Proghdr *eph = ph + Elfhdr->e_phnum;
+	lcr3(PADDR(e->env_pgdir));
 	for (; ph < eph; ph++){
 		if(ph->p_type != ELF_PROG_LOAD){
 			continue;
@@ -415,9 +428,11 @@ load_icode(struct Env *e, uint8_t *binary, size_t size)
 		if(ph->p_filesz > ph->p_memsz || size - ph->p_offset < ph->p_filesz) {
 			panic("load_icode:  out of memory");
 		}
+		region_alloc(e,(void *)ph->p_va,ph->p_memsz);
 		memset((void *) ph->p_va, 0, ph->p_memsz);
 		memcpy((void *)ph->p_va, binary + ph->p_offset, ph->p_filesz);
 	}
+	lcr3(PADDR(kern_pgdir));
 
 #ifdef CONFIG_KSPACE
 	// Uncomment this for task №5.
@@ -426,6 +441,7 @@ load_icode(struct Env *e, uint8_t *binary, size_t size)
 	// Now map one page for the program's initial stack
 	// at virtual address USTACKTOP - PGSIZE.
 	// LAB 8: Your code here.
+	region_alloc(e, (void *)(USTACKTOP - PGSIZE), PGSIZE);
 }
 
 //
@@ -640,6 +656,8 @@ env_run(struct Env *e)
 		curenv = e;
 		curenv->env_status = ENV_RUNNING;
 		curenv->env_runs++;
+		cprintf("%d\n", (int)curenv->env_pgdir);
+		lcr3(PADDR(curenv->env_pgdir));
 	}
 	env_pop_tf(&curenv->env_tf);
 }
