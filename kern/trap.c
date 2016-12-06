@@ -197,6 +197,7 @@ trap_dispatch(struct Trapframe *tf)
 {
 	// Handle processor exceptions.
 	if(tf->tf_trapno == T_PGFLT){
+		cprintf("pgfault\n");
 		page_fault_handler(tf);
 	}
 
@@ -251,7 +252,7 @@ trap(struct Trapframe *tf)
 	// the interrupt path.
 	assert(!(read_eflags() & FL_IF));
 
-	cprintf("Incoming TRAP frame at %p\n", tf);
+	//cprintf("Incoming TRAP frame at %p\n", tf);
 
 	assert(curenv);
 
@@ -332,6 +333,35 @@ page_fault_handler(struct Trapframe *tf)
 	//   (the 'tf' variable points at 'curenv->env_tf').
 
 	// LAB 9: Your code here.
+	if(curenv->env_pgfault_upcall){
+		unsigned int esp = tf->tf_esp;
+		if(esp >= (UXSTACKTOP - PGSIZE) && esp <= UXSTACKTOP - 1){
+			int len = sizeof(struct UTrapframe) + 4;
+			user_mem_assert(curenv, (void *)(esp - len), len,  PTE_P | PTE_U | PTE_W);
+			esp -= 4;
+		} else {
+			int len = sizeof(struct UTrapframe);
+			user_mem_assert(curenv, (void *)(UXSTACKTOP)- len, len,  PTE_P | PTE_U | PTE_W);
+			esp = UXSTACKTOP;
+		}
+		esp -= 4;
+		*((uint32_t *)esp) = tf->tf_esp;
+		esp -= 4;
+		*((uint32_t *)esp) = tf->tf_eflags;
+		esp -= 4;
+		*((uint32_t *)esp) = tf->tf_eip;
+		esp -= sizeof(struct PushRegs);
+		*((struct PushRegs *)esp) = tf->tf_regs;
+		esp -= 4;
+		*((uint32_t *)esp) = tf->tf_err;
+		esp -= 4;
+		*((uint32_t *)esp) = fault_va;
+
+		curenv->env_tf.tf_eip = (uintptr_t)(curenv->env_pgfault_upcall);
+		curenv->env_tf.tf_esp = esp;
+
+		env_run(curenv);
+	}
 
 	// Destroy the environment that caused the fault.
 	cprintf("[%08x] user fault va %08x ip %08x\n",

@@ -229,11 +229,9 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 	if (!(e = env_free_list)) {
 		return -E_NO_FREE_ENV;
 	}
-
 	// Allocate and set up the page directory for this environment.
 	if ((r = env_setup_vm(e)) < 0)
 		return r;
-
 	// Generate an env_id for this environment.
 	generation = (e->env_id + (1 << ENVGENSHIFT)) & ~(NENV - 1);
 	if (generation <= 0)	// Don't create a negative env_id.
@@ -279,12 +277,11 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 	e->env_tf.tf_cs = GD_UT | 3;
 #endif
 
-	e->env_tf.tf_eflags |= FL_IF;
-
 	// You will set e->env_tf.tf_eip later.
 
 	// Enable interrupts while in user mode.
 	// LAB 9: Your code here.
+	e->env_tf.tf_eflags |= FL_IF;
 
 	// Clear the page fault handler until user installs one.
 	e->env_pgfault_upcall = 0;
@@ -537,7 +534,7 @@ env_free(struct Env *e)
 void
 env_destroy(struct Env *e)
 {
-#ifdef CONFIG_KSPACE
+//#ifdef CONFIG_KSPACE
 	// If e is currently running on other CPUs, we change its state to
 	// ENV_DYING. A zombie environment will be freed the next time
 	// it traps to the kernel.
@@ -552,13 +549,13 @@ env_destroy(struct Env *e)
 		curenv = NULL;
 		sched_yield();
 	}
-#else
+/*#else
 	env_free(e);
 
 	cprintf("Destroyed the only environment - nothing more to do!\n");
 	while (1)
 		monitor(NULL);
-#endif
+#endif*/
 }
 
 #ifdef CONFIG_KSPACE
@@ -654,19 +651,19 @@ env_run(struct Env *e)
 	//
 	//LAB 3: Your code here.
 
-	/*cprintf("envrun %s: %d\n",
-		e->env_status == ENV_RUNNING ? "RUNNING" :
-		    e->env_status == ENV_RUNNABLE ? "RUNNABLE" : "(unknown)",
-		ENVX(e->env_id));*/
+	
 
 	if(curenv != e){
+		cprintf("\nenvrun %s: %x\n",
+		e->env_status == ENV_RUNNING ? "RUNNING" :
+		    e->env_status == ENV_RUNNABLE ? "RUNNABLE" : "(unknown)",
+		e->env_id);
 		if(curenv && curenv->env_status == ENV_RUNNING){
 			curenv->env_status = ENV_RUNNABLE;
 		}
 		curenv = e;
 		curenv->env_status = ENV_RUNNING;
 		curenv->env_runs++;
-		cprintf("%d\n", (int)curenv->env_pgdir);
 		lcr3(PADDR(curenv->env_pgdir));
 	}
 	env_pop_tf(&curenv->env_tf);

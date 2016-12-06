@@ -603,34 +603,24 @@ int
 user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 {
 	// LAB 8: Your code here.
-	uintptr_t bound = ROUNDUP((uintptr_t)va + len, PGSIZE);
-	uintptr_t index = (uintptr_t)va;
-	pte_t *tmppte;
-	for(; index < bound; index += PGSIZE){
-		if(index >= ULIM){
-			user_mem_check_addr = index;
+	uintptr_t end = ROUNDUP((uintptr_t)va + len, PGSIZE);
+	uintptr_t addr = (uintptr_t)va;
+	pte_t *pte;
+	for(; addr < end; addr = ROUNDDOWN(addr  + PGSIZE, PGSIZE)){
+		if(addr >= ULIM){
+			user_mem_check_addr = addr;
 			return -E_FAULT;
 		}
-		tmppte = pgdir_walk(env->env_pgdir, (void *)index, 0);
-		if(tmppte == NULL){
-			user_mem_check_addr = index;
+		pte = pgdir_walk(env->env_pgdir, (void *)addr, 0);
+		if(!pte){
+			user_mem_check_addr = addr;
 			return -E_FAULT;
 		}
-		unsigned int previ = PGOFF(*tmppte);
-		if((previ & PTE_P) == 0){
-			user_mem_check_addr = index;
-			return -E_FAULT;
-		}
-		if(previ & PTE_U){
-			if(!(previ & PTE_W) && (perm&PTE_W)){
-				user_mem_check_addr = index;
+		if((*pte & (perm | PTE_U | PTE_P)) != (perm | PTE_U | PTE_P)){
+				user_mem_check_addr = addr;
 				return -E_FAULT;
-			}
-		}else{
-			user_mem_check_addr = index;
-			return -E_FAULT;
 		}
-		index = ROUNDDOWN(index,PGSIZE);
+
 	}
 
 	return 0;

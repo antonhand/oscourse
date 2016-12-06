@@ -11,14 +11,19 @@ forkchild(const char *cur, char branch)
 {
 	char nxt[DEPTH+1];
 
+	//envid_t e = sys_getenvid();
+
 	if (strlen(cur) >= DEPTH)
 		return;
 
+	//cprintf("wr I am %x\n", e);
 	snprintf(nxt, DEPTH+1, "%s%c", cur, branch);
+	//cprintf("end wr I am %x\n", e);
 	if (fork() == 0) {
 		forktree(nxt);
 		exit();
 	}
+	
 }
 
 void
