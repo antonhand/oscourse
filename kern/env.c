@@ -653,7 +653,7 @@ env_run(struct Env *e)
 
 	
 
-	if(curenv != e){
+	if(curenv != e){ 
 		/*cprintf("\nenvrun %s: %x\n",
 		e->env_status == ENV_RUNNING ? "RUNNING" :
 		    e->env_status == ENV_RUNNABLE ? "RUNNABLE" : "(unknown)",
