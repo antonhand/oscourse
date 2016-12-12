@@ -74,6 +74,8 @@ TRAPHANDLER_NOEC(handler_mchk, T_MCHK);
 TRAPHANDLER_NOEC(handler_simderr, T_SIMDERR);
 TRAPHANDLER_NOEC(handler_syscall, T_SYSCALL);
 
+TRAPHANDLER_NOEC(handler_irq_clock, IRQ_OFFSET + IRQ_CLOCK );
+
 .globl _alltraps
 .type _alltraps, @function;
 .align 2

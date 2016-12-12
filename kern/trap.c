@@ -110,6 +110,7 @@ trap_init(void)
 	SETGATE(idt[T_SIMDERR], 0, GD_KT, handler_simderr, 0);
 	SETGATE(idt[T_SYSCALL], 0, GD_KT, handler_syscall, 3);
 
+
 	// Per-CPU setup 
 	trap_init_percpu();
 }
@@ -140,9 +141,9 @@ trap_init_percpu(void)
 void
 clock_idt_init(void)
 {
-	extern void (*clock_thdlr)(void);
-	// init idt structure
-	SETGATE(idt[IRQ_OFFSET + IRQ_CLOCK], 0, GD_KT, (int)(&clock_thdlr), 0);
+	extern void handler_irq_clock();
+
+	SETGATE(idt[IRQ_OFFSET + IRQ_CLOCK], 0 ,GD_KT, handler_irq_clock, 0);
 	lidt(&idt_pd);
 }
 
@@ -197,7 +198,6 @@ trap_dispatch(struct Trapframe *tf)
 {
 	// Handle processor exceptions.
 	if(tf->tf_trapno == T_PGFLT){
-		cprintf("pgfault\n");
 		page_fault_handler(tf);
 	}
 

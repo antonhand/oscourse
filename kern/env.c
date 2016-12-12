@@ -654,10 +654,10 @@ env_run(struct Env *e)
 	
 
 	if(curenv != e){
-		cprintf("\nenvrun %s: %x\n",
+		/*cprintf("\nenvrun %s: %x\n",
 		e->env_status == ENV_RUNNING ? "RUNNING" :
 		    e->env_status == ENV_RUNNABLE ? "RUNNABLE" : "(unknown)",
-		e->env_id);
+		e->env_id);*/
 		if(curenv && curenv->env_status == ENV_RUNNING){
 			curenv->env_status = ENV_RUNNABLE;
 		}
