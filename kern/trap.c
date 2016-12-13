@@ -111,6 +111,21 @@ trap_init(void)
 	SETGATE(idt[T_SYSCALL], 0, GD_KT, handler_syscall, 3);
 
 
+	extern void handler_irq_timer();
+	extern void handler_irq_kbd();
+	extern void handler_irq_serial();
+	extern void handler_irq_spurious();
+	extern void handler_irq_ide();
+	extern void handler_irq_error();
+
+	SETGATE(idt[IRQ_OFFSET + IRQ_TIMER], 0, GD_KT, handler_irq_timer, 0);
+	SETGATE(idt[IRQ_OFFSET + IRQ_KBD], 0, GD_KT, handler_irq_kbd, 0);
+	SETGATE(idt[IRQ_OFFSET + IRQ_SERIAL], 0, GD_KT, handler_irq_serial, 0);
+	SETGATE(idt[IRQ_OFFSET + IRQ_SPURIOUS], 0, GD_KT, handler_irq_spurious, 0);
+	SETGATE(idt[IRQ_OFFSET + IRQ_IDE], 0, GD_KT, handler_irq_ide, 0);
+	SETGATE(idt[IRQ_OFFSET + IRQ_ERROR], 0, GD_KT, handler_irq_error, 0);
+
+
 	// Per-CPU setup 
 	trap_init_percpu();
 }

@@ -377,14 +377,15 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 			return -E_INVAL;
 
 		pte_t *pte;
-		page_lookup(curenv->env_pgdir, srcva, &pte);
+		struct PageInfo *pg = page_lookup(curenv->env_pgdir, srcva, &pte);
 
 		if(perm & PTE_W && !(*pte & PTE_W)) {
 			return -E_INVAL;
 		}
 
-		if ((uint32_t)(env->env_ipc_dstva) < UTOP)
-			r = sys_page_map(0, srcva, envid, env->env_ipc_dstva, perm);
+		if ((uint32_t)(env->env_ipc_dstva) < UTOP){
+			r = page_insert(env->env_pgdir, pg, env->env_ipc_dstva, perm);
+		}
 		if (r < 0)
 			return r;
 	}

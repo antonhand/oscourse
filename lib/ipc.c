@@ -65,7 +65,7 @@ ipc_send(envid_t to_env, uint32_t val, void *pg, int perm)
 		else
 			r = sys_ipc_try_send(to_env, val, (void *)UTOP, 0);
 		if(r < 0 && r != -E_IPC_NOT_RECV)
-			panic("send failed!");
+			panic("send failed! %i", r);
 
 		sys_yield();
 	}

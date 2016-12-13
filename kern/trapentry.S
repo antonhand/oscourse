@@ -75,6 +75,12 @@ TRAPHANDLER_NOEC(handler_simderr, T_SIMDERR);
 TRAPHANDLER_NOEC(handler_syscall, T_SYSCALL);
 
 TRAPHANDLER_NOEC(handler_irq_clock, IRQ_OFFSET + IRQ_CLOCK );
+TRAPHANDLER_NOEC(handler_irq_timer, IRQ_OFFSET + IRQ_TIMER)
+TRAPHANDLER_NOEC(handler_irq_kbd, IRQ_OFFSET + IRQ_KBD)
+TRAPHANDLER_NOEC(handler_irq_serial, IRQ_OFFSET + IRQ_SERIAL)
+TRAPHANDLER_NOEC(handler_irq_spurious, IRQ_OFFSET + IRQ_SPURIOUS)
+TRAPHANDLER_NOEC(handler_irq_ide, IRQ_OFFSET + IRQ_IDE)
+TRAPHANDLER_NOEC(handler_irq_error, IRQ_OFFSET + IRQ_ERROR)
 
 .globl _alltraps
 .type _alltraps, @function;
