@@ -89,17 +89,21 @@ duppage(envid_t envid, unsigned pn)
 	}
 	//cprintf("%d\n", pn);
 	pte_t pte = uvpt[pn];
-	if(!(pte & PTE_P)){
+	if (!(pte & PTE_P)){
 			return 0;
 	}
 	
-	if((pte & PTE_W) || (pte & PTE_COW)){
+	if (pte & PTE_SHARE) {
+		r = sys_page_map(0, (void *)addr, envid, (void *)addr, pte & (PTE_SYSCALL|PTE_SHARE));
+		if (r < 0)
+			panic("sys_page_map: %i\n", r);
+	} else if((pte & PTE_W) || (pte & PTE_COW)){
 		/*if(pn == 977917)
 			cprintf("gut\n");*/
 		r = sys_page_map(0, (void *)addr, envid, (void *)addr,  PTE_U|PTE_P|PTE_COW);
 		if(r < 0)
 			panic("duppage: error page map\n");
-		r = sys_page_map(0, (void *)addr, 0, (void *)addr ,PTE_U|PTE_P|PTE_COW);
+		r = sys_page_map(0, (void *)addr, 0, (void *)addr, PTE_U|PTE_P|PTE_COW);
 		if(r < 0)
 			panic("duppage: error page map\n");
 	}else{

@@ -317,7 +317,7 @@ page_alloc(int alloc_flags)
 			memset(page2kva(ret_val), 0, PGSIZE);
 		}
 	}
-
+	
 	return ret_val;
 }
 
@@ -524,10 +524,10 @@ page_remove(pde_t *pgdir, void *va)
 	// Fill this function in
 	pte_t *pte;
 	struct PageInfo *pp = page_lookup(pgdir, va, &pte);
-	if(!pp){
+	if(!pp || !*pte){
 		return;
 	}
-
+	
 	page_decref(pp);
 	*pte = 0;
 	tlb_invalidate(pgdir, va);
