@@ -67,6 +67,7 @@ KERN_BINFILES :=	user/hello \
 			user/faultwrite \
 			user/faultwritekernel \
 			user/idle \
+			user/itask \
 			user/yield \
 			user/dumbfork \
 			user/stresssched \
