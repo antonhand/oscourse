@@ -198,7 +198,6 @@ void print_timer_error(void)
 void timer_start(void)
 {
     //Lab 5: You code here
-		tsc_calibrate();
 		tsc = read_tsc();
 }
 
