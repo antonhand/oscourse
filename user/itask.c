@@ -1,6 +1,8 @@
 #include <inc/lib.h>
 #include <inc/time.h>
 
+#define LAMBDA1 50
+
 int test_clock_gettime(void)
 {
     struct timespec tp;
@@ -19,7 +21,7 @@ int test_clock_gettime(void)
 
     int clock;
 
-    for(clock = CLOCK_MONOTONIC; clock <= CLOCK_PROCESS_CPUTIME_ID; clock++){
+    for(clock = CLOCK_MONOTONIC; clock <= CLOCK_REALTIME; clock++){
         struct timespec tp1, tp2;
         int i;
 
@@ -39,6 +41,27 @@ int test_clock_gettime(void)
         if(diff > 1 || diff < -1){
             return 1;
         }
+    }
+
+    int k, prev_s = 0;
+    long prev_ns = 0;
+    for(k = 0; k < 6; k++){
+        struct timespec tp1, tp2;
+        int i;
+
+        sys_clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &tp1);
+        for(i = 0; i < 1000000; i++);
+
+        sys_clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &tp2);
+
+        diff = tp2.tv_sec - tp1.tv_sec;
+        int diff1 = tp2.tv_nsec - tp1.tv_nsec;
+
+        if(prev_s && prev_ns && ((diff - prev_s) || diff1 - prev_ns >  LAMBDA1 || diff1 - prev_ns < -LAMBDA1)){
+            return 1;
+        }
+        prev_s = diff;
+        prev_ns = (prev_ns * k + diff1) / (k + 1);
     }
 
     return 0;
@@ -109,22 +132,14 @@ int test_clock_settime(void)
     tp.tv_nsec = 0;     
 
     for(clock = CLOCK_REALTIME; clock <= CLOCK_PROCESS_CPUTIME_ID; clock++){
-        sys_clock_settime(clock, &tp);
-
         struct timespec tp1;
-        int diff, i;
-
-        int timestart = sys_gettime();
-
-        for(i = 0; i < 1000000000; i++);
-        
-        diff = sys_gettime() - timestart;
-
+        sys_clock_settime(clock, &tp);
         sys_clock_gettime(clock, &tp1);
 
-        int diff1 = tp.tv_sec + diff - tp1.tv_sec;
+        int diff = tp1.tv_sec - tp.tv_sec;
+        int diff1 = tp1.tv_nsec - tp.tv_nsec;
 
-        if(diff1 > 1 || diff1 < -1){
+        if(diff || diff1 > LAMBDA1 || diff1 < -LAMBDA1){
             return 1;
         }
     }
@@ -157,7 +172,11 @@ int test_clock_nanosleep(void)
     struct timespec tp;
     int clock;
 
-    for(clock = CLOCK_MONOTONIC; clock <= CLOCK_PROCESS_CPUTIME_ID; clock++){
+    if(!clock_nanosleep(CLOCK_PROCESS_CPUTIME_ID)){
+        return 1;
+    }
+
+    for(clock = CLOCK_MONOTONIC; clock <= CLOCK_REALTIME; clock++){
         sys_clock_gettime(clock, &tp);
 
         tp.tv_sec += 4;
@@ -174,7 +193,7 @@ int test_clock_nanosleep(void)
         }
     }
 
-    for(clock = CLOCK_MONOTONIC; clock <= CLOCK_PROCESS_CPUTIME_ID; clock++){
+    for(clock = CLOCK_MONOTONIC; clock <= CLOCK_REALTIME; clock++){
         tp.tv_sec = 3;
         tp.tv_nsec = 361462;
 
@@ -193,41 +212,39 @@ int test_clock_nanosleep(void)
         }
     }
 
-    for(clock = CLOCK_REALTIME; clock <= CLOCK_PROCESS_CPUTIME_ID; clock++){
-        int abstime;
-        for(abstime = TIMER_ABSTIME; abstime < TIMER_ABSTIME - 2; abstime--){
-            struct timespec tp1, tp2;
+    int abstime;
+    for(abstime = TIMER_ABSTIME; abstime < TIMER_ABSTIME - 2; abstime--){
+        struct timespec tp1, tp2;
 
-            sys_clock_gettime(clock, &tp);
+        sys_clock_gettime(CLOCK_REALTIME, &tp);
 
-            tp1 = tp;
-            
-            if(abstime == TIMER_ABSTIME){
-                tp.tv_sec += 4;
-            } else {
-                tp.tv_sec = 4;
-                tp.tv_nsec = 4;
+        tp1 = tp;
+
+        if(abstime == TIMER_ABSTIME){
+            tp.tv_sec += 4;
+        } else {
+            tp.tv_sec = 4;
+            tp.tv_nsec = 4;
+        }
+
+        if(fork()){
+            if(abstime != TIMER_ABSTIME){
+                sys_clock_gettime(CLOCK_MONOTONIC, &tp1);
             }
+            clock_nanosleep(CLOCK_REALTIME, abstime, &tp, NULL);
+        } else {
+            for(i = 0; i < 100000; i++);
+            sys_clock_settime(CLOCK_REALTIME, &tp);
+            exit();
+        }
 
-            if(fork()){
-                if(abstime != TIMER_ABSTIME){
-                    sys_clock_gettime(CLOCK_MONOTONIC, &tp1);
-                }
-                clock_nanosleep(clock, abstime, &tp, NULL);
-            } else {
-                for(i = 0; i < 100000; i++);
-                sys_clock_settime(clock, &tp);
-                exit();
-            }
+        sys_clock_gettime(CLOCK_MONOTONIC, &tp2);
 
-            sys_clock_gettime(CLOCK_MONOTONIC, &tp2);
+        int diff = tp2.tv_sec - tp1.tv_sec;
 
-            int diff = tp2.tv_sec - tp1.tv_sec;
-
-            if((diff >= 4 && abstime == TIMER_ABSTIME)
-            || (diff < 4 && abstime != TIMER_ABSTIME)){
-                return 1;
-            }
+        if((diff >= 4 && abstime == TIMER_ABSTIME)
+        || (diff < 4 && abstime != TIMER_ABSTIME)){
+            return 1;
         }
     }
 
