@@ -517,6 +517,10 @@ page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 		*pte_store = pgtable;
 	}
 
+	if(!(*pgtable & PTE_P)){
+		return NULL;
+	}
+
 	return pa2page(PTE_ADDR(*pgtable));
 }
 
@@ -541,7 +545,7 @@ page_remove(pde_t *pgdir, void *va)
 	// Fill this function in
 	pte_t *pte;
 	struct PageInfo *pp = page_lookup(pgdir, va, &pte);
-	if(!pp || !*pte){
+	if(!pp){
 		return;
 	}
 	

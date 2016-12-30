@@ -31,6 +31,8 @@ i386_init(void)
 
 	tsc_calibrate();
 
+	clock_init();
+
 	cprintf("6828 decimal is %o octal!\n", 6828);
 	cprintf("END: %p\n", end);
 

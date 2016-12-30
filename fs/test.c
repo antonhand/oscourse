@@ -25,7 +25,7 @@ fs_test(void)
 	assert(bits[r/32] & (1 << (r%32)));
 	// and is not free any more
 	assert(!(bitmap[r/32] & (1 << (r%32))));
-	cprintf("alloc_block is good\n");
+	//cprintf("alloc_block is good\n");
 
 	if ((r = file_open("/not-found", &f)) < 0 && r != -E_NOT_FOUND)
 		panic("file_open /not-found: %i", r);
@@ -33,25 +33,25 @@ fs_test(void)
 		panic("file_open /not-found succeeded!");
 	if ((r = file_open("/newmotd", &f)) < 0)
 		panic("file_open /newmotd: %i", r);
-	cprintf("file_open is good\n");
+	//cprintf("file_open is good\n");
 
 	if ((r = file_get_block(f, 0, &blk)) < 0)
 		panic("file_get_block: %i", r);
 	if (strcmp(blk, msg) != 0)
 		panic("file_get_block returned wrong data");
-	cprintf("file_get_block is good\n");
+	//cprintf("file_get_block is good\n");
 
 	*(volatile char*)blk = *(volatile char*)blk;
 	assert((uvpt[PGNUM(blk)] & PTE_D));
 	file_flush(f);
 	assert(!(uvpt[PGNUM(blk)] & PTE_D));
-	cprintf("file_flush is good\n");
+	//cprintf("file_flush is good\n");
 
 	if ((r = file_set_size(f, 0)) < 0)
 		panic("file_set_size: %i", r);
 	assert(f->f_direct[0] == 0);
 	assert(!(uvpt[PGNUM(f)] & PTE_D));
-	cprintf("file_truncate is good\n");
+	//cprintf("file_truncate is good\n");
 
 	if ((r = file_set_size(f, strlen(msg))) < 0)
 		panic("file_set_size 2: %i", r);
@@ -63,5 +63,5 @@ fs_test(void)
 	file_flush(f);
 	assert(!(uvpt[PGNUM(blk)] & PTE_D));
 	assert(!(uvpt[PGNUM(f)] & PTE_D));
-	cprintf("file rewrite is good\n");
+	//cprintf("file rewrite is good\n");
 }

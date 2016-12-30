@@ -4,6 +4,8 @@
 #include <inc/stdio.h>
 
 #include <kern/tsc.h>
+#include <kern/kclock.h>
+#include <kern/env.h>
 
 /* The clock frequency of the i8253/i8254 PIT */
 #define PIT_TICK_RATE 1193182ul
@@ -11,6 +13,10 @@
 #define TIMES 100
 
 uint64_t tsc = 0;
+uint64_t  mono_start = 0;
+struct timespec realtime_start;
+
+struct timespec resol;
 
 unsigned long cpu_freq;
 /*
@@ -210,4 +216,87 @@ void timer_stop(void)
 		} else {
 			cprintf("error: TSC has not been started\n");
 		}
+}
+
+void clock_init(void)
+{
+	cprintf("CLOCK INIT\n");
+	mono_start = read_tsc();
+	realtime_start.tv_sec = gettime();
+	realtime_start.tv_nsec = 0;
+	resol.tv_sec = 1 / cpu_freq / 1000;
+	resol.tv_nsec = 1000000 / cpu_freq;
+
+	if(!resol.tv_sec && !resol.tv_nsec){
+		resol.tv_nsec = 1;
+	}
+
+	cprintf("clock resolution: %d s %ld ns\n", resol.tv_sec, resol.tv_nsec);
+}
+
+void clock_getres(int clock_id, struct timespec *res)
+{
+	*res = resol;
+}
+
+// gettime в зависимости от типа будет записывать по адресу tp:
+// CLOCK_MONOTONIC: разность текущего значения регистра TSC и mono_start, 
+// переведённую в секунды и наносекунды
+//
+// CLOCK_REALTIME: сумму realtime_start и разности текущего значения регистра TSC
+// и mono_start, переведённой в секунды и наносекунды
+//
+// CLOCK_PROCESS_CPUTIME_ID: сумму curenv->env_cputime и разность текущего значения 
+// регистра TSC и curenv->env_cputime_start, переведённую в секунды и наносекунды
+void clock_gettime(int clock_id, struct timespec *tp)
+{
+	uint64_t tme = 0;
+	tp->tv_sec = 0;
+	tp->tv_nsec = 0;
+	switch(clock_id)
+	{
+		case CLOCK_REALTIME:
+			*tp = realtime_start;
+		case CLOCK_MONOTONIC:
+			tme = read_tsc() - mono_start;
+			break;
+		case CLOCK_PROCESS_CPUTIME_ID:
+			tme = curenv->env_cputime + (read_tsc() - curenv->env_cputime_start);
+			break;
+	}
+	struct timespec tme1;
+
+	tme1.tv_sec = tme / cpu_freq / 1000;
+	tme1.tv_nsec = (tme % (cpu_freq * 1000)) * 1000000 / cpu_freq;
+
+	*tp = add_timespec(tp, &tme1);
+}
+
+// clock_settime в зависимости от типа:
+// CLOCK_MONOTONIC: вернёт ошибку
+//
+// CLOCK_REALTIME: установит realtime_start как разность заданного значения и разности текущего значения
+// регистра TSC и mono_start, переведённого в секунды и наносекунды.
+//
+// CLOCK_PROCESS_CPUTIME_ID: установит curenv->env_cputime как разность заданного значения,
+// переведённого в такты процессора, и разности текущего значения регистра TSC и curenv->env_cputime_start.
+int clock_settime(int clock_id, const struct timespec *tp)
+{
+	uint64_t tme;
+	struct timespec tme1;
+	switch(clock_id)
+	{
+		case CLOCK_REALTIME:
+			tme = read_tsc() - mono_start;
+			tme1.tv_sec = tme / cpu_freq / 1000;
+			tme1.tv_nsec = (tme % (cpu_freq * 1000)) * 1000000 / cpu_freq;
+			realtime_start = sub_timespec(tp, &tme1);
+			break;
+		case CLOCK_PROCESS_CPUTIME_ID:
+			tme = tp->tv_sec * cpu_freq * 1000 + tp->tv_nsec * cpu_freq / 1000000;
+			curenv->env_cputime = tme - (read_tsc() - curenv->env_cputime_start);
+			break;
+	}
+	
+	return 0;
 }

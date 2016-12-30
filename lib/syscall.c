@@ -117,7 +117,32 @@ sys_ipc_recv(void *dstva)
 	return syscall(SYS_ipc_recv, 1, (uint32_t)dstva, 0, 0, 0, 0);
 }
 
-int sys_gettime(void)
+int
+sys_gettime(void)
 {
 	return syscall(SYS_gettime, 0, 0, 0, 0, 0, 0);
+}
+
+int
+sys_clock_getres(int clock_id, struct timespec *res)
+{
+	return syscall(SYS_clock_getres, 1, clock_id, (uint32_t) res, 0, 0, 0);
+}
+
+int
+sys_clock_gettime(int clock_id, struct timespec *tp)
+{
+	return syscall(SYS_clock_gettime, 1, clock_id, (uint32_t) tp, 0, 0, 0);
+}
+
+int
+sys_clock_settime(int clock_id, const struct timespec *tp)
+{
+	return syscall(SYS_clock_settime, 1, clock_id, (uint32_t) tp, 0, 0, 0);
+}
+
+int
+sys_clock_nanosleep(int clock_id, int flags, const struct timespec *rqtp, struct timespec *rmtp)
+{
+	return syscall(SYS_clock_nanosleep, 1, clock_id, flags, (uint32_t) rqtp, (uint32_t) rmtp, 0);
 }

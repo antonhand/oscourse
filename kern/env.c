@@ -247,6 +247,7 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 #endif
 	e->env_status = ENV_RUNNABLE;
 	e->env_runs = 0;
+	e->env_cputime = 0;
 
 	// Clear out all the saved register state,
 	// to prevent the register values
@@ -667,10 +668,12 @@ env_run(struct Env *e)
 		e->env_id);*/
 		if(curenv && curenv->env_status == ENV_RUNNING){
 			curenv->env_status = ENV_RUNNABLE;
+			curenv->env_cputime += read_tsc() - curenv->env_cputime_start;
 		}
 		curenv = e;
 		curenv->env_status = ENV_RUNNING;
 		curenv->env_runs++;
+		curenv->env_cputime_start = read_tsc();
 		lcr3(PADDR(curenv->env_pgdir));
 	}
 	env_pop_tf(&curenv->env_tf);

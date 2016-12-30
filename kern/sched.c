@@ -2,6 +2,7 @@
 #include <inc/x86.h>
 #include <kern/env.h>
 #include <kern/monitor.h>
+#include <kern/tsc.h>
 
 
 struct Taskstate cpu_ts;
@@ -26,25 +27,49 @@ sched_yield(void)
 	// below to halt the cpu.
 
 	// LAB 3: Your code here.
+	int sleeping = 0;
+
 	uint32_t i = 1;
-	struct Env *e = envs - 1;
-	if(curenv){
-		e = curenv;
-	}
-	for(;e + i < envs + NENV; i++){
-		if (e[i].env_status == ENV_RUNNABLE){
-					 env_run(&e[i]);
-					 return;
-				 }
-	}
-	i = 0;
-	for(;envs + i <= curenv; i++){
-		if ((envs[i].env_status == ENV_RUNNABLE ||
-				 envs[i].env_status == ENV_RUNNING)){
-					 env_run(&envs[i]);
-					 return;
-				 }
-	}
+	do{
+		struct Env *e = envs - 1;
+		if(curenv){
+			e = curenv;
+		}
+		for(;e + i < envs + NENV; i++){
+			if (e[i].env_status == ENV_SLEEPING){
+				sleeping = 1;
+				struct timespec tp;
+				clock_gettime(e[i].env_sleep_clockid, &tp);
+				tp = sub_timespec(&tp, &e[i].env_wakeup_time);
+				if(tp.tv_sec >= 0 && tp.tv_nsec >= 0){
+					e[i].env_status = ENV_RUNNABLE;
+					sleeping = 0;
+				}
+			}
+			if (e[i].env_status == ENV_RUNNABLE){
+				env_run(&e[i]);
+				return;
+			}
+		}
+		i = 0;
+		for(;envs + i <= curenv; i++){
+			if (e[i].env_status == ENV_SLEEPING){
+				sleeping = 1;
+				struct timespec tp;
+				clock_gettime(e[i].env_sleep_clockid, &tp);
+				tp = sub_timespec(&tp, &e[i].env_wakeup_time);
+				if(tp.tv_sec >= 0 && tp.tv_nsec >= 0){
+					e[i].env_status = ENV_RUNNABLE;
+					sleeping = 0;
+				}
+			}
+			if ((envs[i].env_status == ENV_RUNNABLE || envs[i].env_status == ENV_RUNNING)){
+				env_run(&envs[i]);
+				return;
+			}
+		}
+	} while(sleeping);
+
 	// sched_halt never returns
 	sched_halt();
 }
@@ -62,6 +87,7 @@ sched_halt(void)
 	for (i = 0; i < NENV; i++) {
 		if ((envs[i].env_status == ENV_RUNNABLE ||
 		     envs[i].env_status == ENV_RUNNING ||
+			 envs[i].env_status == ENV_SLEEPING ||
 		     envs[i].env_status == ENV_DYING))
 			break;
 	}

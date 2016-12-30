@@ -34,7 +34,8 @@ KERN_SRCFILES :=	kern/entry.S \
 			kern/tsc.c
 
 KERN_SRCFILES +=       kern/spinlock.c \
-		       kern/alloc.c
+		       kern/alloc.c \
+			   kern/time.c
 
 # Only build files if they exist.
 KERN_SRCFILES := $(wildcard $(KERN_SRCFILES))
@@ -67,7 +68,6 @@ KERN_BINFILES :=	user/hello \
 			user/faultwrite \
 			user/faultwritekernel \
 			user/idle \
-			user/itask \
 			user/yield \
 			user/dumbfork \
 			user/stresssched \
@@ -98,7 +98,8 @@ KERN_BINFILES :=	user/hello \
 			user/testpteshare \
 			user/testshell \
 			user/date \
-			user/vdate
+			user/vdate \
+			user/itask
 KERN_BINFILES := $(patsubst %, $(OBJDIR)/%, $(KERN_BINFILES))
 endif
 

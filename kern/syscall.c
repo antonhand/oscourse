@@ -12,6 +12,7 @@
 #include <kern/console.h>
 #include <kern/sched.h>
 #include <kern/kclock.h>
+#include <kern/tsc.h>
 
 // Print a string to the system console.
 // The string is exactly 'len' characters long.
@@ -452,6 +453,99 @@ sys_gettime(void)
 	return gettime();
 }
 
+static int
+sys_clock_getres(int clock_id, struct timespec *res)
+{
+	user_mem_assert(curenv, (void *)res, sizeof(struct timespec), PTE_U|PTE_P);
+	if(clock_id < 0 || clock_id >= CLOCK_NUM){
+		return -E_INVAL;
+	}
+	clock_getres(clock_id, res);
+	return 0;
+}
+
+static int
+sys_clock_gettime(int clock_id, struct timespec *tp)
+{
+	user_mem_assert(curenv, (void *)tp, sizeof(struct timespec), PTE_U|PTE_P);
+	if(clock_id < 0 || clock_id >= CLOCK_NUM){
+		return -E_INVAL;
+	}
+
+	clock_gettime(clock_id, tp);
+	return 0;
+}
+
+static int
+sys_clock_settime(int clock_id, const struct timespec *tp)
+{
+	user_mem_assert(curenv, (void *)tp, sizeof(struct timespec), PTE_U|PTE_P|PTE_W);
+	if(clock_id == CLOCK_MONOTONIC){
+		return -E_INVAL;
+	}
+
+	if(clock_id < 0 || clock_id >= CLOCK_NUM){
+		return -E_INVAL;
+	}
+
+	if(tp->tv_sec < 0 || tp->tv_nsec < 0 || tp->tv_nsec > 999999999){
+		return -E_INVAL;
+	}
+
+	clock_settime(clock_id, tp);
+
+	return 0;
+}
+
+// В случае передачи в clock_id CLOCK_PROCESS_CPUTIME_ID вернёт ошибку.
+//
+// При установленном флаге TIMER_ABSTIME функция установит curenv->env_sleep_clockid
+// идентификатор соответствующих часов, в curenv->env_wakeup_time время, заданное в rqtp, 
+// установит  curenv->env_status в ENV_SLEEPING и вызовет sched_yield()
+//
+// Если флаг TIMER_ABSTIME не установлен, то будет выполнены действия, аналогичные предыдущему случаю,
+// только в curenv->env_sleep_clockid будет установлено CLOCK_MONOTONIC,
+// а в curenv->env_wakeup_time сумму текущего времени по CLOCK_MONOTONIC и значения, заданного в rqtp.
+static int
+sys_clock_nanosleep(int clock_id, int flags, const struct timespec *rqtp, struct timespec *rmtp)
+{
+	if(rmtp){
+		user_mem_assert(curenv, (void *)rmtp, sizeof(struct timespec), PTE_U|PTE_P);
+	}
+    if(clock_id == CLOCK_PROCESS_CPUTIME_ID){
+		return -E_INVAL;
+	}
+
+	if(clock_id < 0 || clock_id >= CLOCK_NUM){
+		return -E_INVAL;
+	}
+
+	if(rqtp->tv_sec < 0 || rqtp->tv_nsec < 0 || rqtp->tv_nsec > 999999999){
+		return -E_INVAL;
+	}
+
+    struct timespec tp = *rqtp;
+
+    if(flags != TIMER_ABSTIME){
+        clock_id = CLOCK_MONOTONIC;
+        clock_gettime(CLOCK_MONOTONIC, &tp);
+        tp = add_timespec(rqtp, &tp);
+    }
+
+    curenv->env_sleep_clockid = clock_id;
+    curenv->env_wakeup_time = tp;
+    curenv->env_status = ENV_SLEEPING;
+
+	curenv->env_tf.tf_regs.reg_eax = 0;
+	if(rmtp){
+		rmtp->tv_sec = 0;
+		rmtp->tv_nsec = 0;
+	}
+    sched_yield();
+
+    return 0;
+}
+
 // Dispatches to the correct kernel function, passing the arguments.
 int32_t
 syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5)
@@ -510,6 +604,17 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 		case SYS_gettime:
 			res = sys_gettime();
             break;
+		case SYS_clock_getres:
+			res = sys_clock_getres(a1,(void*)a2);
+			break;
+		case SYS_clock_gettime:
+			res = sys_clock_gettime(a1,(void*)a2);
+			break;
+		case SYS_clock_settime:
+			res = sys_clock_settime(a1,(void*)a2);
+			break;
+		case SYS_clock_nanosleep:
+			sys_clock_nanosleep(a1, a2, (void*)a3, (void*)a4);
         case NSYSCALLS:
         default:
             res = -E_INVAL;

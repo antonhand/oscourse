@@ -6,6 +6,7 @@
 #include <inc/types.h>
 #include <inc/trap.h>
 #include <inc/memlayout.h>
+#include <inc/time.h>
 
 typedef int32_t envid_t;
 
@@ -25,7 +26,7 @@ typedef int32_t envid_t;
 // envid_ts less than 0 signify errors.  The envid_t == 0 is special, and
 // stands for the current environment.
 
-#define LOG2NENV		10
+#define LOG2NENV		8
 #define NENV			(1 << LOG2NENV)
 #define ENVX(envid)		((envid) & (NENV - 1))
 
@@ -35,7 +36,8 @@ enum {
 	ENV_DYING,
 	ENV_RUNNABLE,
 	ENV_RUNNING,
-	ENV_NOT_RUNNABLE
+	ENV_NOT_RUNNABLE,
+	ENV_SLEEPING
 };
 
 // Special environment types
@@ -65,6 +67,12 @@ struct Env {
 	uint32_t env_ipc_value;		// Data value sent to us
 	envid_t env_ipc_from;		// envid of the sender
 	int env_ipc_perm;		// Perm of page mapping received
+
+	//Itask clock
+	int64_t env_cputime;
+	int64_t env_cputime_start;
+	int env_sleep_clockid;
+	struct timespec env_wakeup_time;
 };
 
 #endif // !JOS_INC_ENV_H

@@ -21,6 +21,7 @@
 #include <inc/fs.h>
 #include <inc/fd.h>
 #include <inc/args.h>
+#include <inc/time.h>
 
 #define USED(x)		(void)(x)
 
@@ -60,6 +61,10 @@ int	sys_page_unmap(envid_t env, void *pg);
 int	sys_ipc_try_send(envid_t to_env, uint32_t value, void *pg, int perm);
 int	sys_ipc_recv(void *rcv_pg);
 int sys_gettime(void);
+int sys_clock_getres(int clock_id, struct timespec *res);
+int sys_clock_gettime(int clock_id, struct timespec *tp);
+int sys_clock_settime(int clock_id, const struct timespec *tp);
+int sys_clock_nanosleep(int clock_id, int flags, const struct timespec *rqtp, struct timespec *rmtp);
 
 int vsys_gettime(void);
 

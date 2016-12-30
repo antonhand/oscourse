@@ -2,9 +2,9 @@
 
 В inc/time.h будут объявлена структура timespec и константы CLOCK_MONOTONIC, CLOCK_REALTIME, CLOCK_PROCESS_CPUTIME_ID
 
-Для реализации CLOCK_MONOTONIC и CLOCK_REALTIME в файле kern/tsc.c будут заведены переменные mono_start типа uint64_t и realtime_start типа int64_t.
+Для реализации CLOCK_MONOTONIC и CLOCK_REALTIME в файле kern/tsc.c будут заведены переменные mono_start типа uint64_t и realtime_start типа struct timespec.
 Переменная mono_start будет инициализирована значением регистра TSC при запуске ядра.
-Переменная realtime_start будет инициализирована значением, возвращаемым функцией gettime, переведённым в количество тактов процессора.
+Переменная realtime_start будет инициализирована значением, возвращаемым функцией gettime.
 
 Для реализации CLOCK_PROCESS_CPUTIME_ID в структуру Env будут добавлены новые члены int64_t env_cputime int64_t env_cputime_start.
 env_cputime будет изначально инициализироваться нулём, а при каждом переключении с данного процесса на другой туда будет добавляться время в тактах процессора, 
@@ -23,19 +23,19 @@ getres будет записывать по адресу res значение п
 
 gettime в зависимости от типа будет записывать по адресу tp:
 CLOCK_MONOTONIC: разность текущего значения регистра TSC и mono_start, переведённую в секунды и наносекунды
-CLOCK_REALTIME: сумму realtime_start и разности текущего значения регистра TSC и mono_start, переведённую в секунды и наносекунды
-CLOCK_PROCESS_CPUTIME_ID: сумму curenv->env_cputime и разность текущего значения регистра TSC и curenv->env_cputime_start, переведённую в секунды и наносекунды
+CLOCK_REALTIME: сумму realtime_start и разности текущего значения регистра TSC и mono_start, переведённой в секунды и наносекунды
+CLOCK_PROCESS_CPUTIME_ID: сумму curenv->env_cputime и разности текущего значения регистра TSC и curenv->env_cputime_start, переведённую в секунды и наносекунды
 
 clock_settime в зависимости от типа:
 CLOCK_MONOTONIC: вернёт ошибку
-CLOCK_REALTIME: установит realtime_start как разность заданного значения, переведённого в такты процессора, и разности текущего значения регистра TSC и mono_start.
+CLOCK_REALTIME: установит realtime_start как разность заданного значения и разности текущего значения регистра TSC и mono_start, переведённого в секунды и наносекунды.
 CLOCK_PROCESS_CPUTIME_ID: установит curenv->env_cputime как разность заданного значения, переведённого в такты процессора, и разности текущего значения регистра TSC и curenv->env_cputime_start.
 
 Для реализации всех вышеназванных функций будут созданы с префиксами sys_ соответствующие системные вызовы в файлах lib/syscall.c и kern/syscall.c
 
-В файле inc/time.h будет создана функция
-int clock_nanosleep(int clock_id, int flags, const struct timespec *rqtp, struct timespec *rmtp);
-и добавлена константа TIMER_ABSTIME
+Будет создан новый системный вызов
+int sys_clock_nanosleep(int clock_id, int flags, const struct timespec *rqtp, struct timespec *rmtp);
+и в inc/time.h будет добавлена константа TIMER_ABSTIME
 
 В inc/env.h будет добавлена константа ENV_SLEEPING для обозначения нового состояния процесса.
 
@@ -44,18 +44,18 @@ int clock_nanosleep(int clock_id, int flags, const struct timespec *rqtp, struct
 
 В случае передачи в clock_id CLOCK_PROCESS_CPUTIME_ID вернёт ошибку.
 
-При установленном флаге TIMER_ABSTIME функция установит thisenv->env_sleep_clockid идентификатор соответствующих часов, в thisenv->env_wakeup_time время, заданное в rqtp, 
-установит  thisenv->env_status в ENV_SLEEPING и вызовет sys_yield()
+При установленном флаге TIMER_ABSTIME функция установит curenv->env_sleep_clockid идентификатор соответствующих часов, в curenv->env_wakeup_time время, заданное в rqtp, 
+установит  curenv->env_status в ENV_SLEEPING и вызовет sched_yield()
 
-Если флаг TIMER_ABSTIME не установлен, то будет выполнены действия, аналогичные предыдущему случаю, только в thisenv->env_sleep_clockid будет установлено CLOCK_MONOTONIC,
-а в thisenv->env_wakeup_time сумму текущего времени по CLOCK_MONOTONIC и значения, заданного в rqtp.
+Если флаг TIMER_ABSTIME не установлен, то будет выполнены действия, аналогичные предыдущему случаю, только в curenv->env_sleep_clockid будет установлено CLOCK_MONOTONIC,
+а в curenv->env_wakeup_time сумму текущего времени по CLOCK_MONOTONIC и значения, заданного в rqtp.
 
 Для поддержки будет изменена функция sched_yield() в kern/sched.c так, чтобы она могла запускать те процессы с установленным статусом ENV_SLEEPING,
 у которых еnv_wakeup_time меньше текущего времени по соответствующим часам.
 
---------------------ТЕСТЫ--------------------
-Реализация тестов представлена в user/itask.c
----------------------------------------------
+----------------------------------------ТЕСТЫ----------------------------------------
+Реализация тестов представлена в user/itask.c. Запускается по команде make run-itask
+-------------------------------------------------------------------------------------
 Для проверки правильности работы часов реального времени:
 Сравнивать результаты, полученные sys_clock_gettime(CLOCK_REALTIME, tp) и sys_gettime. Допустимая погрешность - 1 секунда.
 
